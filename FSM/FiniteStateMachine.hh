@@ -217,6 +217,29 @@ namespace Core
 
 
          /**
+          * Removes an existing transition.
+          * This is a 'fancy' capability that should be used with caution.
+          *
+          * @param event   The event that is to be removed from the transition table.
+          * @return the old state to which the removed event was transitioning
+          *    or SentinelStateID indicating that there was no such transition.
+          */
+         virtual StateID RemoveTransition(
+            const Event & event
+            )
+         {
+            StateID old_state{ SentinelStateID };
+            auto dit = transition_table.find( event );
+            if ( dit != transition_table.end() )
+            {
+               std::swap( dit->second, old_state );
+               transition_table.erase( dit );
+            }
+            return old_state;
+         }
+
+
+         /**
           * Retrieves the target state if a transition was installed for the
           * provided event.
           *
