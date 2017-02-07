@@ -129,6 +129,7 @@ namespace Core
             :  entry_function()
             ,  exit_function()
             ,  dispatch_table()
+            ,  single_dispatch()
          { }
 
 
@@ -266,11 +267,13 @@ namespace Core
           *
           * @param event   The event that is to be handled.
           * @param handler The handler function object to set.
+          * @param single_dispatch_only If the handler can only be executed once.
           * @return The reference to this State object.
           */
          virtual State & SetEventHandler(
             const Event & event,
-            const EventHandler & handler
+            const EventHandler & handler,
+            bool single_dispatch_only = false
             )
          {
             // Indicates that the event has already been configured in this
@@ -278,6 +281,10 @@ namespace Core
             //
             assert( transition_table.find( event ) == transition_table.end() );
             dispatch_table.insert( { event, handler } );
+            if ( single_dispatch_only )
+            {
+               single_dispatch.insert( { event, nullptr } );
+            }
             return *this;
          }
 
@@ -296,6 +303,16 @@ namespace Core
             )
          {
             EventHandler old_handler{};
+            auto sit = single_dispatch.find( event );
+            if ( sit != single_dispatch.end() )
+            {
+               if ( sit->second != nullptr )
+               {
+                  std::swap( sit->second, old_handler );
+                  single_dispatch[event] = handler;
+                  return std::move( old_handler );
+               }
+            }
             auto dit = dispatch_table.find( event );
             if ( dit != dispatch_table.end() )
             {
@@ -326,6 +343,15 @@ namespace Core
             {
                handler = dit->second;
             }
+            auto sit = single_dispatch.find( event );
+            if ( sit != single_dispatch.end() )
+            {
+               if ( sit->second == nullptr )
+               {
+                  sit->second = dit->second;
+                  dit->second = [this]( const Event & ) { /* NOOP */ };
+               }
+            }
             return std::move( handler );
          }
 
@@ -344,7 +370,7 @@ namespace Core
           * taking place and the state is becoming the previous state.
           * @return The ExitFunction of the state.
           */
-         inline ExitFunction Exit() const { return exit_function; }
+         inline ExitFunction Exit() const { RestoreDispatchTable(); return exit_function; }
 
 
       private :
@@ -352,6 +378,13 @@ namespace Core
          /// the state.
          ///
          using DispatchTable = std::map< Event, EventHandler >;
+
+         /// Those events that should be handled only once in this state
+         /// are entered here. Just the fact that an entry exists in this
+         /// table assures that event is a single dispatch event. On exit
+         /// the event dispatch is restored.
+         ///
+         using SingleDispatch = std::map< Event, EventHandler >;
 
          /// Describes what state transition to take when an event arrives for
          /// the state. Note that the DispatchTable and the TransitionTable
@@ -361,10 +394,29 @@ namespace Core
 
 
       private :
-         EntryFunction     entry_function;
-         ExitFunction      exit_function;
-         DispatchTable     dispatch_table;
-         TransitionTable   transition_table;
+         EntryFunction             entry_function;
+         ExitFunction              exit_function;
+         mutable DispatchTable     dispatch_table;
+         mutable SingleDispatch    single_dispatch;
+         TransitionTable           transition_table;
+
+
+      private :
+         /**
+          * For those events that are to be dispatched only once it restores
+          * the dispatch table so that it may handle the event again.
+          */
+         void RestoreDispatchTable() const
+         {
+            for ( auto sit : single_dispatch )
+            {
+               if ( sit.second != nullptr )
+               {
+                  dispatch_table[sit.first] = sit.second;
+                  sit.second = nullptr;
+               }
+            }
+         }
       };
 
 
@@ -374,6 +426,10 @@ namespace Core
       ///
       static const StateID SentinelStateID{ -1 };
 
+      /// Convenience value to descriptively set the similarly named function
+      /// argument in SetEventHandler().
+      ///
+      static const bool SingleDispatchOnly{ true };
 
    public :
       /**
