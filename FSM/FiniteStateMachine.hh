@@ -343,8 +343,9 @@ namespace Core
           *
           * @param event   The event that is to be stored and forwarded to the next state.
           * @param eset    The state transition events that forward the event.
+          * @return The reference to this State object.
           */
-         virtual void StoreAndForwardEvent(
+         virtual State & StoreAndForwardEvent(
             const Event & event,
             const EventSet & eset
             )
@@ -363,6 +364,7 @@ namespace Core
                   storeforward_table[eit] = eset;
                }
             }
+            return *this;
          }
 
          /**
