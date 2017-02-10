@@ -141,7 +141,15 @@ namespace Core
             ,  exit_function()
             ,  dispatch_table()
             ,  single_dispatch()
+            ,  default_handler()
+            ,  transition_table()
+            ,  forwarded_events()
+            ,  event_store()
+            ,  storeforward_table()
          { }
+
+
+         virtual ~State() = default;
 
 
          /**
@@ -301,6 +309,21 @@ namespace Core
 
 
          /**
+          * Sets the default event handler function of the state to use when an
+          * event does not have a specific handler.
+          *
+          * @param handler The handler function object to set.
+          */
+         virtual State & SetDefaultEventHandler(
+            const EventHandler & handler
+            )
+         {
+            default_handler = handler;
+            return *this;
+         }
+
+
+         /**
           * Replaces a potentially existing event handler function with another.
           * This is a 'fancy' capability that should be used with caution.
           *
@@ -381,7 +404,7 @@ namespace Core
             const Event & event
             ) const
          {
-            EventHandler handler{};
+            EventHandler handler{ default_handler };
             auto dit = dispatch_table.find( event );
             if ( dit != dispatch_table.end() )
             {
@@ -397,6 +420,17 @@ namespace Core
                }
             }
             return std::move( handler );
+         }
+
+
+         /**
+          * Gets the state specific default event handler function.
+          *
+          * @return The default handler function object.
+          */
+         virtual EventHandler DefaultEventHandler()
+         {
+            return default_handler;
          }
 
 
@@ -515,6 +549,7 @@ namespace Core
          ExitFunction              exit_function;
          mutable DispatchTable     dispatch_table;
          mutable SingleDispatch    single_dispatch;
+         EventHandler              default_handler;  // state specific default handler
          TransitionTable           transition_table;
          ForwardedEvents           forwarded_events;
          Events                    event_store;
@@ -818,6 +853,26 @@ namespace Core
       inline void PurgeInternalEvents()
       {
          internal_events.clear();
+      }
+
+
+      /**
+       * Removes the specific event from the external event queue.
+       */
+      inline void RemoveEvent( const Event & event )
+      {
+         auto it = std::find( events.begin(), events.end(), (int) event );
+         if ( it != events.end() ) { events.erase( it ); }
+      }
+
+
+      /**
+       * Removes the specific event from the external event queue.
+       */
+      inline void RemoveInternalEvent( const Event & event )
+      {
+         auto it = std::find( internal_events.begin(), internal_events.end(), (int) event );
+         if ( it != internal_events.end() ) { internal_events.erase( it ); }
       }
 
 
