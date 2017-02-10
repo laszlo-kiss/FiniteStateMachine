@@ -50,6 +50,7 @@
 #include <vector>
 #include <deque>
 #include <map>
+#include <set>
 #include <sstream>
 
 
@@ -76,6 +77,16 @@ namespace Core
        */
       using Event = EVENT;
 
+      /**
+       * Events are queued to the state machine and stored in instances of this
+       * type.
+       */
+      using Events = std::deque< Event >;
+
+      /**
+       * Collection of Events.
+       */
+      using EventSet = std::set< Event >;
 
       /**
        * An event handler is simply a function object that is called to handle
@@ -322,6 +333,37 @@ namespace Core
             return std::move( old_handler );
          }
 
+         /**
+          * Designates an event to be stored and forwarded to the next state instead
+          * of handling it or performing a state transition based on it. This is useful
+          * when an event arrives 'early' in some state, but it is actually useful in a
+          * subsequent state and loss of the event makes things difficult. The usefulness
+          * of this capability is limited by whether the event so stored can be handled
+          * out of order.
+          *
+          * @param event   The event that is to be stored and forwarded to the next state.
+          * @param eset    The state transition events that forward the event.
+          */
+         virtual void StoreAndForwardEvent(
+            const Event & event,
+            const EventSet & eset
+            )
+         {
+            forwarded_events.insert( event );
+            for ( auto eit : eset )
+            {
+               auto sfit = storeforward_table.find( eit );
+               if ( sfit != storeforward_table.end() )
+               {
+                  sfit->second.insert( event );
+               }
+               else
+               {
+                  EventSet eset{ event };
+                  storeforward_table[eit] = eset;
+               }
+            }
+         }
 
          /**
           * Called by the FiniteStateMachine class when it is dispatching an
@@ -373,6 +415,69 @@ namespace Core
          inline ExitFunction Exit() const { RestoreDispatchTable(); return exit_function; }
 
 
+         /**
+          * Returns whether the state is equipped with 'store-and-forward' events.
+          *
+          * @return true if the state supports store-and-forward events.
+          */
+         inline bool IsStoringForwarding() const
+         {
+            return ! forwarded_events.empty();
+         }
+
+
+         /**
+          * Stores the given event in the event store.
+          *
+          * @param event   The event to store (for forwarding).
+          */
+         inline void StoreEvent(
+            const Event & event
+            )
+         {
+            event_store.push_back( event );
+         }
+
+
+         /**
+          * Clears the event store of the state.
+          */
+         inline void ClearEventStore() { event_store.clear(); }
+
+
+         /**
+          * Checks whether the event store of the state is empty.
+          */
+         inline bool IsEventStoreEmpty() { return event_store.empty(); }
+
+
+         /**
+          * Forwards events that were stored based on the transition event given.
+          *
+          * @param event   The transition event.
+          * @param destination   The next state's event_store.
+          */
+         void ForwardEvents(
+            const Event & event,
+            Events & destination
+            )
+         {
+            auto sfit = storeforward_table.find( event );
+            if ( sfit != storeforward_table.end() )
+            {
+               const EventSet & eset( sfit->second );
+               for ( auto sit : event_store )
+               {
+                  if ( eset.find( sit ) != eset.end() )
+                  {
+                     destination.push_back( sit );
+                  }
+               }
+            }
+            event_store.clear();
+         }
+
+
       private :
          /// The mechanism used to associate an event handler with an event in
          /// the state.
@@ -392,6 +497,16 @@ namespace Core
          ///
          using TransitionTable = std::map< Event, StateID >;
 
+         /// The events that are being forwarded in this state.
+         ///
+         using ForwardedEvents = EventSet;
+
+         /// Each event transition (key) passes the events in the set. If the set
+         /// is empty then all stored events are passed. If there is no entry in the
+         /// table for the (transition) event then all stored events are discarded.
+         ///
+         using StoreAndForwardTable = std::map< Event, EventSet >;
+
 
       private :
          EntryFunction             entry_function;
@@ -399,6 +514,9 @@ namespace Core
          mutable DispatchTable     dispatch_table;
          mutable SingleDispatch    single_dispatch;
          TransitionTable           transition_table;
+         ForwardedEvents           forwarded_events;
+         Events                    event_store;
+         StoreAndForwardTable      storeforward_table;
 
 
       private :
@@ -531,16 +649,19 @@ namespace Core
             throw Exception("Out of bounds state id number.");
          }
 
+         if ( state_table[current_state]->IsStoringForwarding() )
+         {
+            // Clear any stored events since this method essentially acts as
+            // a state machine reset function.
+            //
+            state_table[current_state]->ClearEventStore();
+         }
+
          current_state = new_state;
       }
 
 
    protected :
-      /// Events are queued to the state machine and stored in instances of this
-      /// type.
-      ///
-      using Events = std::deque< Event >;
-
       /// The states registered for this state machine are held in this type.
       /// The raw pointer here is used only as a reference and the FSM must
       /// assure that the lifetime of States are longer than the state table.
@@ -569,6 +690,7 @@ namespace Core
          while ( DeliverNextEvent() );
       }
 
+
       /**
        * The handler installed here catches any events that the current
        * state does not handle. If not set, undefined events for a particular
@@ -579,6 +701,7 @@ namespace Core
       {
          default_handler = handler;
       }
+
 
       /**
        * @return true if there are events waiting to be executed.
@@ -749,6 +872,15 @@ namespace Core
          if ( on_exit != nullptr )
          {
             on_exit( event );
+         }
+
+         if ( state_table[current_state]->IsStoringForwarding() )
+         {
+            // Any stored events are now forwarded as if they arrived as internal
+            // (high priority) events.
+            //
+            assert( state_table[new_state]->IsEventStoreEmpty() );
+            state_table[current_state]->ForwardEvents( event, internal_events );
          }
 
          previous_state = current_state;
