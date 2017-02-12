@@ -686,7 +686,7 @@ namespace Core
             throw Exception("Out of bounds state id number.");
          }
 
-         if ( state_table[current_state]->IsStoringForwarding() )
+         if ( current_state != SentinelStateID && state_table[current_state]->IsStoringForwarding() )
          {
             // Clear any stored events since this method essentially acts as
             // a state machine reset function.
