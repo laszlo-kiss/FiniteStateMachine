@@ -137,7 +137,8 @@ namespace Core
           * Default constructor sets all members to their default values.
           */
          State()
-            :  entry_function()
+            :  state_id( 0 )
+            ,  entry_function()
             ,  exit_function()
             ,  dispatch_table()
             ,  single_dispatch()
@@ -514,6 +515,29 @@ namespace Core
          }
 
 
+         /**
+          * Converts the state object to it's state id.
+          *
+          * @return the state id of the state object.
+          */
+         inline StateID operator () const
+         {
+            return state_id;
+         }
+
+
+         /**
+          * Assigns a state id to the state object.
+          * This should be considered an internal method and should not be
+          * called by user code.
+          */
+         inline void AssignStateID( StateID sid )
+         {
+            assert( sid >= 0 );
+            state_id = sid;
+         }
+
+
       private :
          /// The mechanism used to associate an event handler with an event in
          /// the state.
@@ -545,6 +569,7 @@ namespace Core
 
 
       private :
+         StateID                   state_id;
          EntryFunction             entry_function;
          ExitFunction              exit_function;
          mutable DispatchTable     dispatch_table;
@@ -615,8 +640,10 @@ namespace Core
          State *state
          )
       {
+         assert( state != nullptr );
          int state_number = static_cast<int>( state_table.size() );
          state_table.push_back( state );
+         state->AssignStateID( state_number );
          return state_number;
       }
 
