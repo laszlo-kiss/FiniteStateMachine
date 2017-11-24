@@ -78,6 +78,11 @@ namespace Core
       using Event = EVENT;
 
       /**
+       * When event types are reduced to a number, this is the type.
+       */
+      using EventNumber = int;
+
+      /**
        * Events are queued to the state machine and stored in instances of this
        * type.
        */
@@ -195,20 +200,20 @@ namespace Core
           * @return The reference to this State object.
           */
          virtual State & SetTransition(
-            const Event & event,
+            EventNumber event_number,
             StateID state
             )
          {
             // Indicates that the event has already been configured in this
             // state. A single event can't have multiple functions.
             //
-            assert( dispatch_table.find( event ) == dispatch_table.end() );
+            assert( dispatch_table.find( event_number ) == dispatch_table.end() );
 
             if ( state < LowestValidStateID )
             {
                throw Exception("Out of bounds state id number.");
             }
-            transition_table.insert( { event, state } );
+            transition_table.insert( { event_number, state } );
             return *this;
          }
 
@@ -222,16 +227,16 @@ namespace Core
           * @return the old state that was replaced or SentinelStateID indicating an error.
           */
          virtual StateID ReplaceTransition(
-            const Event & event,
+            EventNumber event_number,
             StateID state
             )
          {
             StateID old_state{ SentinelStateID };
-            auto dit = transition_table.find( event );
+            auto dit = transition_table.find( event_number );
             if ( dit != transition_table.end() )
             {
                std::swap( dit->second, old_state );
-               transition_table[event] = state;
+               transition_table[event_number] = state;
             }
             return old_state;
          }
@@ -246,11 +251,11 @@ namespace Core
           *    or SentinelStateID indicating that there was no such transition.
           */
          virtual StateID RemoveTransition(
-            const Event & event
+            EventNumber event_number
             )
          {
             StateID old_state{ SentinelStateID };
-            auto dit = transition_table.find( event );
+            auto dit = transition_table.find( event_number );
             if ( dit != transition_table.end() )
             {
                std::swap( dit->second, old_state );
@@ -268,11 +273,11 @@ namespace Core
           * @return the StateID of the target state or SentinelStateID if there is no such.
           */
          inline StateID TransitionForEvent(
-            const Event & event
+            EventNumber event_number
             ) const
          {
             StateID target{ SentinelStateID };
-            auto dit = transition_table.find( event );
+            auto dit = transition_table.find( event_number );
             if ( dit != transition_table.end() )
             {
                target = dit->second;
@@ -291,7 +296,7 @@ namespace Core
           * @return The reference to this State object.
           */
          virtual State & SetEventHandler(
-            const Event & event,
+            EventNumber event_number,
             const EventHandler & handler,
             bool single_dispatch_only = false
             )
@@ -299,11 +304,11 @@ namespace Core
             // Indicates that the event has already been configured in this
             // state. A single event can't have multiple functions.
             //
-            assert( transition_table.find( event ) == transition_table.end() );
-            dispatch_table.insert( { event, handler } );
+            assert( transition_table.find( event_number ) == transition_table.end() );
+            dispatch_table.insert( { event_number, handler } );
             if ( single_dispatch_only )
             {
-               single_dispatch.insert( { event, nullptr } );
+               single_dispatch.insert( { event_number, nullptr } );
             }
             return *this;
          }
@@ -333,26 +338,26 @@ namespace Core
           * @return The event handler that was replaced.
           */
          virtual EventHandler ReplaceEventHandler(
-            const Event & event,
+            EventNumber event_number,
             const EventHandler & handler
             )
          {
             EventHandler old_handler{};
-            auto sit = single_dispatch.find( event );
+            auto sit = single_dispatch.find( event_number );
             if ( sit != single_dispatch.end() )
             {
                if ( sit->second != nullptr )
                {
                   std::swap( sit->second, old_handler );
-                  single_dispatch[event] = handler;
+                  single_dispatch[event_number] = handler;
                   return std::move( old_handler );
                }
             }
-            auto dit = dispatch_table.find( event );
+            auto dit = dispatch_table.find( event_number );
             if ( dit != dispatch_table.end() )
             {
                std::swap( dit->second, old_handler );
-               dispatch_table[event] = handler;
+               dispatch_table[event_number] = handler;
             }
             return std::move( old_handler );
          }
@@ -402,16 +407,16 @@ namespace Core
           * @return The EventHandler for the specified event or nullptr if no such.
           */
          inline EventHandler HandlerForEvent(
-            const Event & event
+            EventNumber event_number
             ) const
          {
             EventHandler handler{ default_handler };
-            auto dit = dispatch_table.find( event );
+            auto dit = dispatch_table.find( event_number );
             if ( dit != dispatch_table.end() )
             {
                handler = dit->second;
             }
-            auto sit = single_dispatch.find( event );
+            auto sit = single_dispatch.find( event_number );
             if ( sit != single_dispatch.end() )
             {
                if ( sit->second == nullptr )
@@ -495,11 +500,11 @@ namespace Core
           * @param destination   The next state's event_store.
           */
          void ForwardEvents(
-            const Event & event,
+            EventNumber event_number,
             Events & destination
             )
          {
-            auto sfit = storeforward_table.find( event );
+            auto sfit = storeforward_table.find( event_number );
             if ( sfit != storeforward_table.end() )
             {
                const EventSet & eset( sfit->second );
@@ -520,7 +525,7 @@ namespace Core
           *
           * @return the state id of the state object.
           */
-         inline StateID operator () const
+         inline operator StateID () const
          {
             return state_id;
          }
@@ -886,19 +891,19 @@ namespace Core
       /**
        * Removes the specific event from the external event queue.
        */
-      inline void RemoveEvent( const Event & event )
+      inline void RemoveEvent( EventNumber event_number )
       {
-         auto it = std::find( events.begin(), events.end(), (int) event );
+         auto it = std::find( events.begin(), events.end(), event_number );
          if ( it != events.end() ) { events.erase( it ); }
       }
 
 
       /**
-       * Removes the specific event from the external event queue.
+       * Removes the specific event from the internal event queue.
        */
-      inline void RemoveInternalEvent( const Event & event )
+      inline void RemoveInternalEvent( EventNumber event_number )
       {
-         auto it = std::find( internal_events.begin(), internal_events.end(), (int) event );
+         auto it = std::find( internal_events.begin(), internal_events.end(), event_number );
          if ( it != internal_events.end() ) { internal_events.erase( it ); }
       }
 
