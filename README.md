@@ -16,7 +16,7 @@ See: https://en.wikipedia.org/wiki/Finite-state_machine
 ## Install
 Place in a convenient include directory and include in a C++11 source file.
 
-##Features
+## Features
 * Header only.
 * No dependencies.
 * Supports both synchronous and asynchronous use (examples included).
