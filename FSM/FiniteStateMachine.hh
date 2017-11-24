@@ -119,6 +119,12 @@ namespace Core
 
 
       /**
+       * A set of StateIDs.
+       */
+      using StateIDSet = std::set< StateID >;
+
+
+      /**
        * The exception thrown when the state id number is out of bounds.
        */
       class Exception
@@ -623,6 +629,9 @@ namespace Core
       FiniteStateMachine()
          :  previous_state( SentinelStateID )
          ,  current_state( SentinelStateID )
+         ,  blocking( false )
+         ,  default_handler( nullptr )
+         ,  state_transfer_event( 0 )
       { }
 
 
@@ -686,6 +695,28 @@ namespace Core
 
 
       /**
+       * Checks whether the state machine is blocking events and prevents
+       * posting the event if so.
+       *
+       * @param event The event that is to be queued for execution by the state
+       *              machine.
+       *
+       * @return true if the event was posted, false otherwise.
+       *
+       * @note The choice of which event is to be conditional is left
+       *       to the user and is enforced only through the use (or non-use)
+       *       of this method.
+       */
+      inline bool PostEventConditionally(
+         const Event & event
+         )
+      {
+         if ( IsBlocking() ) { return false; }
+         PostEvent( event );
+         return true;
+      }
+
+      /**
        * Posts an event that will transition the FSM from it's current state
        * to the desired target state.
        *
@@ -698,6 +729,7 @@ namespace Core
          StateID target_state
          )
       {
+         assert( state_transfer_event != 0 );
          Event trans( state_transfer_event + target_state );
          PostInternalEvent( trans );
       }
@@ -786,6 +818,7 @@ namespace Core
        */
       void SetStateTransferEvent( EventNumber event_number )
       {
+         assert( event_number != 0 );
          state_transfer_event = event_number;
          const size_t n_of_states = state_table.size();
          typename StateTable::iterator sit = state_table.begin();
@@ -987,12 +1020,48 @@ namespace Core
       }
 
 
+      /**
+       * Sets a virtual "blocking conditional events" flag. When set so,
+       * the method PostEventConditionally() will not allow posting of
+       * events until one of the states given as an argument is reached.
+       *
+       * @param cleared_in_states   - the states in which the blocking condition
+       *    is automatically cleared.
+       */
+      inline void BlockConditionalEventsUntil(
+         const StateIDSet & cleared_in_states
+         )
+      {
+         assert( block_cleared_in.empty() );
+         block_cleared_in = cleared_in_states;
+      }
+
+
+      /**
+       * Clears the "blocking conditional events" flag. This is a
+       * 'manual override' for the automatic clearing of the blocking
+       * condition.
+       */
+      inline void UnblockConditionalEvents() { block_cleared_in.clear(); }
+
+
+      /**
+       * @return true if the FSM is blocking conditional events, false otherwise.
+       */
+      inline bool IsBlocking() { return not block_cleared_in.empty(); }
+
+
    private :
-      StateID        previous_state;   /// The state prior to the current one.
-      StateID        current_state;    /// The index into the state table.
-      StateTable     state_table;      /// The registered states.
-      Events         events;           /// External events queued up.
-      Events         internal_events;  /// Internal events queued up.
+      StateID        previous_state;      /// The state prior to the current one.
+      StateID        current_state;       /// The index into the state table.
+      StateTable     state_table;         /// The registered states.
+      Events         events;              /// External events queued up.
+      Events         internal_events;     /// Internal events queued up.
+
+      /// When the StateIDSet is non-empty, then any events arriving via the
+      /// PostEventConditionally method are going to blocked. The set contains
+      /// the state IDs of the states in which the blocking condition is lifted.
+      StateIDSet     block_cleared_in;    /// States in which the block is auto-cleared.
 
       /// Set to handle the case when the current state has no suitable event
       /// handler
@@ -1002,6 +1071,7 @@ namespace Core
       /// The event number that is used to transition between arbitrary
       /// states.
       EventNumber    state_transfer_event;
+
 
    private :
       /**
@@ -1060,6 +1130,11 @@ namespace Core
          EntryFunction on_entry( state_table[current_state]->Entry() );
          if ( on_entry != nullptr )
          {
+            if ( IsBlocking() )
+            {
+               auto where = block_cleared_in.find( CurrentState() )
+               if ( where != block_cleared_in.end() ) { block_cleared_in.clear(); }
+            }
             on_entry( event );
          }
 
