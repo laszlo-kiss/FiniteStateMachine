@@ -440,7 +440,7 @@ namespace Core
           *
           * @return The default handler function object.
           */
-         virtual EventHandler DefaultEventHandler()
+         virtual EventHandler DefaultEventHandler() const
          {
             return default_handler;
          }
@@ -496,7 +496,7 @@ namespace Core
          /**
           * Checks whether the event store of the state is empty.
           */
-         inline bool IsEventStoreEmpty() { return event_store.empty(); }
+         inline bool IsEventStoreEmpty() const { return event_store.empty(); }
 
 
          /**
@@ -629,7 +629,6 @@ namespace Core
       FiniteStateMachine()
          :  previous_state( SentinelStateID )
          ,  current_state( SentinelStateID )
-         ,  blocking( false )
          ,  default_handler( nullptr )
          ,  state_transfer_event( 0 )
       { }
@@ -747,7 +746,7 @@ namespace Core
        */
       bool IsDirectTransition(
          const Event & event
-         )
+         ) const
       {
          return (EventNumber) event >= state_transfer_event;
       }
@@ -1048,7 +1047,7 @@ namespace Core
       /**
        * @return true if the FSM is blocking conditional events, false otherwise.
        */
-      inline bool IsBlocking() { return not block_cleared_in.empty(); }
+      inline bool IsBlocking() const { return not block_cleared_in.empty(); }
 
 
    private :
@@ -1132,7 +1131,7 @@ namespace Core
          {
             if ( IsBlocking() )
             {
-               auto where = block_cleared_in.find( CurrentState() )
+               auto where = block_cleared_in.find( CurrentState() );
                if ( where != block_cleared_in.end() ) { block_cleared_in.clear(); }
             }
             on_entry( event );
