@@ -686,6 +686,41 @@ namespace Core
 
 
       /**
+       * Posts an event that will transition the FSM from it's current state
+       * to the desired target state.
+       *
+       * @param target_state     - the state to which the transition is to be made.
+       *
+       * @note The entry and exit functions do get executed, just like under normal
+       *    event handling conditions.
+       */
+      inline void PostTransitionTo(
+         StateID target_state
+         )
+      {
+         Event trans( state_transfer_event + target_state );
+         PostInternalEvent( trans );
+      }
+
+
+      /**
+       * @return true if the event passed in is a direct state transfer
+       *    event, false otherwise.
+       *
+       * @note May be used to detect that a state transition occured
+       *    because of a direct transition rather than a user defined
+       *    event. This knowledge is useful when entry/exit functions
+       *    should behave differently when a direct transfer takes
+       *    place.
+       */
+      bool IsDirectTransition(
+         const Event & event
+         )
+      {
+         return (EventNumber) event >= state_transfer_event;
+      }
+
+      /**
        * @return the current state identifier of the FSM.
        */
       inline StateID CurrentState() const
@@ -729,6 +764,50 @@ namespace Core
          current_state = new_state;
       }
 
+      /**
+       * Used only when there is a need to perform transitions from any state
+       * to any other state. In other words, this enables the user to perform
+       * ad-hoc state transitions. That is useful in cases where the state
+       * machine is to be tracking the actual state of an external system.
+       * In that case it may be necessary to simply match the state of the
+       * external system instead of transitioning the state machine.
+       * It sets the event number that is used to perform direct state to state
+       * transitions. The event number should be the largest positive number
+       * assigned to events in the class. The method internally creates
+       * additional event numbers based on the number of states in the class.
+       *
+       * This method should only be called after the states have been
+       * configured and only if arbitrary state transitions are desired.
+       * Note that the entry/exit functions do get called when the transitions
+       * take place.
+       *
+       * @param event_number  - the event number that serves as the state transfer
+       *       event.
+       */
+      void SetStateTransferEvent( EventNumber event_number )
+      {
+         state_transfer_event = event_number;
+         const size_t n_of_states = state_table.size();
+         typename StateTable::iterator sit = state_table.begin();
+         StateID sid = LowestValidStateID;
+         for ( ; sit != state_table.end(); ++sit, ++sid )
+         {
+            State *state = *sit;
+            assert( sid == *state );
+            EventNumber e = event_number;
+            for ( StateID s = LowestValidStateID; s < n_of_states; ++s, ++e )
+            {
+               if ( s == sid ) continue;     // skip self transition
+               // Make sure that the user selected an event number that is
+               // the largest numeric value.
+               if ( state->TransitionForEvent( e ) != SentinelStateID )
+               {
+                  throw Exception("Bad state transfer event selection.");
+               }
+               state->SetTransition( e, s );
+            }
+         }
+      }
 
    protected :
       /// The states registered for this state machine are held in this type.
@@ -920,6 +999,9 @@ namespace Core
       ///
       EventHandler   default_handler;
 
+      /// The event number that is used to transition between arbitrary
+      /// states.
+      EventNumber    state_transfer_event;
 
    private :
       /**
