@@ -662,6 +662,32 @@ namespace Core
 
 
       /**
+       * Enables derived types to replace states in the state machine table for
+       * better customization. It may be necessary to override the behavior of
+       * an existing state machine, but only in certain circumstances. This places
+       * the new state in the state table (with an existing ID) and returns the old
+       * state. The old state then can be called for side effects of it's existing
+       * functionality.
+       * 
+       * @param  state_id - the identifier of the state to replace
+       * @param  state    - the new state object to replace it with
+       * @return          - the old state being replaced
+       */
+      State * ReplaceState(
+         StateID state_id,
+         State *state
+         )
+      {
+         assert( state != nullptr );
+         assert( state_id < static_cast<int>( state_table.size() ) );
+         State *old_state = state_table[state_id];
+         assert( old_state != nullptr );
+         state->AssignStateID( state_id );
+         state_table[ state_id ] = state;
+      }
+
+
+      /**
        * The primary work horse method of the FSM which posts (enqueues) the
        * provided event on the normal priority event queue.
        *
