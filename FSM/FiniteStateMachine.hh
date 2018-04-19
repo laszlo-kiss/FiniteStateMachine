@@ -688,6 +688,20 @@ namespace Core
 
 
       /**
+       * Returns to the caller the actual State object for the supplied state
+       * ID number.
+       * 
+       * @param  state_id the ID of the state of interest
+       * @return          the corresponding state object (pointer)
+       */
+      State * StateForID( StateID state_id )
+      {
+         assert( state_id < static_cast<int>( state_table.size() ) );
+         return state_table[state_id];
+      }
+
+
+      /**
        * The primary work horse method of the FSM which posts (enqueues) the
        * provided event on the normal priority event queue.
        *
