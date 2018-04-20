@@ -704,6 +704,7 @@ namespace Core
          assert( old_state != nullptr );
          state->AssignStateID( state_id );
          state_table[ state_id ] = state;
+         return old_state;
       }
 
 
