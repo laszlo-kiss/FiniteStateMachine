@@ -18,7 +18,8 @@ Place in a convenient include directory and include in a C++11 source file.
 
 ## Features
 * Header only.
-* No dependencies.
+* No dependencies for synchronous state machines.
+* Boost ASYNC dependency for asynchronous state machines.
 * Supports both synchronous and asynchronous use (examples included).
 
 ## Tested on:
