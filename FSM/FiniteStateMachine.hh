@@ -272,6 +272,26 @@ namespace Core
 
 
          /**
+          * Copies the transition table from one state to another. Useful for
+          * those cases when the target state (the one to which the copy is made)
+          * is a state that will be overriding the current state. Thus, the target
+          * will have all the transitions that exist. This is tempered by the
+          * exception list, which prevents those transitions from being copied.
+          * 
+          * @param state  the target state to which to copy the transitions to
+          * @param except the events for which the transition will not be copied
+          */
+         void CopyTransitionsTo( State & state, const EventSet & except )
+         {
+            for ( auto trans : transition_table )
+            {
+               if ( except.find( trans.first ) != except.end() ) { continue; }
+               state.transition_table[ trans.first ] = trans.second;
+            }
+         }
+
+
+         /**
           * Retrieves the target state if a transition was installed for the
           * provided event.
           *
@@ -553,20 +573,20 @@ namespace Core
          /// The mechanism used to associate an event handler with an event in
          /// the state.
          ///
-         using DispatchTable = std::map< Event, EventHandler >;
+         using DispatchTable = std::map< EventNumber, EventHandler >;
 
          /// Those events that should be handled only once in this state
          /// are entered here. Just the fact that an entry exists in this
          /// table assures that event is a single dispatch event. On exit
          /// the event dispatch is restored.
          ///
-         using SingleDispatch = std::map< Event, EventHandler >;
+         using SingleDispatch = std::map< EventNumber, EventHandler >;
 
          /// Describes what state transition to take when an event arrives for
          /// the state. Note that the DispatchTable and the TransitionTable
          /// are mutually exclusive (the same event can't be in both).
          ///
-         using TransitionTable = std::map< Event, StateID >;
+         using TransitionTable = std::map< EventNumber, StateID >;
 
          /// The events that are being forwarded in this state.
          ///
@@ -576,7 +596,7 @@ namespace Core
          /// is empty then all stored events are passed. If there is no entry in the
          /// table for the (transition) event then all stored events are discarded.
          ///
-         using StoreAndForwardTable = std::map< Event, EventSet >;
+         using StoreAndForwardTable = std::map< EventNumber, EventSet >;
 
 
       private :
