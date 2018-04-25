@@ -708,7 +708,7 @@ namespace Core
       State * ReplaceState(
          StateID state_id,
          State *state,
-         const std::string & state_name
+         const std::string & state_name = ""
          )
       {
          assert( state != nullptr );
@@ -1207,6 +1207,17 @@ namespace Core
       void Instrument( InstrumentationFunction func )
       {
          instrumentation = func;
+      }
+
+      /**
+       * Returns the current instrumentation function. Enables access to a
+       * base class' instrumentation to augment it.
+       * 
+       * @return The existing instrumentation (which could be null).
+       */
+      InstrumentationFunction Instrument()
+      {
+         return instrumentation;
       }
 
 
