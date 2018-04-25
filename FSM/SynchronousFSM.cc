@@ -127,12 +127,43 @@ AudioPlayer::Machine::Machine()
 
    // The supported states must be registered.
    //
-   STOPPED_STATE = RegisterState( & stopped );
-   PLAYING_STATE = RegisterState( & playing );
+   STOPPED_STATE = RegisterState( & stopped, "STOPPED_STATE" );
+   PLAYING_STATE = RegisterState( & playing, "PLAYING_STATE" );
+
+   RegisterEvent( START_PLAYING_EVENT, "START_PLAYING_EVENT" );
+   RegisterEvent( STOP_PLAYING_EVENT, "STOP_PLAYING_EVENT" );
 
    // Establish the starting state, this is important.
    //
    SetInitialState( STOPPED_STATE );
+
+   Instrument(
+      [this](
+         const std::string & reason,
+         const StateName & from_state,
+         const StateName & to_state,
+         const EventName & event_name
+         )
+         {
+            if ( reason == "entry" )
+            {
+               std::cerr << "FSM: " << reason << " to '" << to_state << "' from '" << from_state << "' via '" << event_name << "'." << std::endl;
+            }
+            else if ( reason == "exit" )
+            {
+               std::cerr << "FSM: " << reason << " from '" << from_state << "' to '" << to_state << "' via '" << event_name << "'." << std::endl;
+            }
+            else if ( reason == "handled" || reason == "ignored" )
+            {
+               assert( from_state == to_state );
+               std::cerr << "FSM: " << reason << " '" << event_name << "' in '" << to_state << "'." << std::endl;
+            }
+            else
+            {
+               assert( false );
+            }
+         }
+      );
 
    // Configure the states' event handlers and transitions.
    //

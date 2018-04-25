@@ -83,6 +83,11 @@ namespace Core
       using EventNumber = int;
 
       /**
+       * When accessing an optional human readable name for an event.
+       */
+      using EventName = std::string;
+
+      /**
        * Events are queued to the state machine and stored in instances of this
        * type.
        */
@@ -116,6 +121,11 @@ namespace Core
        * An alternate mechanism to refer to a state object.
        */
       using StateID = int;
+
+      /**
+       * When accessing an optional human readable name for a state.
+       */
+      using StateName = std::string;
 
 
       /**
@@ -670,13 +680,15 @@ namespace Core
        * @return the state identifier chosen for the state.
        */
       virtual StateID RegisterState(
-         State *state
+         State *state,
+         const std::string & state_name = ""
          )
       {
          assert( state != nullptr );
          int state_number = static_cast<int>( state_table.size() );
          state_table.push_back( state );
          state->AssignStateID( state_number );
+         state_names.push_back( state_name );
          return state_number;
       }
 
@@ -695,7 +707,8 @@ namespace Core
        */
       State * ReplaceState(
          StateID state_id,
-         State *state
+         State *state,
+         const std::string & state_name
          )
       {
          assert( state != nullptr );
@@ -704,6 +717,7 @@ namespace Core
          assert( old_state != nullptr );
          state->AssignStateID( state_id );
          state_table[ state_id ] = state;
+         state_names[ state_id ] = state_name;
          return old_state;
       }
 
@@ -719,6 +733,28 @@ namespace Core
       {
          assert( state_id < static_cast<int>( state_table.size() ) );
          return state_table[state_id];
+      }
+
+
+      /**
+       * Registers the event number with a corresponding name, so that when
+       * logging is enabled the event numbers can be translated to human readable
+       * strings.
+       * 
+       * @param event_number - an identifier associated with the event
+       * @param event_name   - name of the event
+       */
+      void RegisterEvent(
+         EventNumber event_number,
+         EventName   event_name
+         )
+      {
+         EventNames::iterator it = event_names.find( event_number );
+         if ( it != event_names.end() )
+         {
+            throw std::runtime_error("Duplicate event registration.");
+         }
+         event_names[ event_number ] = event_name;
       }
 
 
@@ -909,6 +945,34 @@ namespace Core
       ///
       using StateTable = std::vector< State * >;
 
+      /// During registration there is an option to supply a name for the state
+      /// being registered. This type holds those state names.
+      /// 
+      using StateNames = std::vector< std::string >;
+
+      /// Events may be registered with a name as well.
+      ///
+      using EventNames = std::map< EventNumber, std::string >;
+
+      /// A function signature that serves as a state machine instrumentation
+      /// mechanism. It is called by the FSM at various points of the state
+      /// machine's life cycle.
+      ///
+      /// The 'reason' may be: "entry", "exit", "handled", "ignored"
+      /// These refer to the state entry, state exit, event handled and event ignored
+      /// scenarios.
+      /// The 'from_state' is the name of the state from which a transition
+      /// is taking place. The 'to_state' is which state the machine is transitioning
+      /// into. These may be the same name in some circumstances.
+      /// 
+      using InstrumentationFunction =
+         std::function< void (
+            const std::string & reason,
+            const StateName & from_state,
+            const StateName & to_state,
+            const EventName & event_name
+            ) >;
+
 
    protected :
       /// A boundary number that identifies the lowest numeric value for a
@@ -991,9 +1055,19 @@ namespace Core
             {
                EventHandler handler = state->HandlerForEvent( ev );
                if ( handler != nullptr )
+               {
+                  if ( instrumentation ) ResolveAndCall( "handled", current_state, current_state, ev );
                   handler( ev );
+               }
                else if ( default_handler != nullptr )
+               {
+                  if ( instrumentation ) ResolveAndCall( "handled", current_state, current_state, ev );
                   default_handler( ev );
+               }
+               else
+               {
+                  if ( instrumentation ) ResolveAndCall( "ignored", current_state, current_state, ev );
+               }
             }
             internal_events.pop_front();
          }
@@ -1013,9 +1087,19 @@ namespace Core
             {
                EventHandler handler( state->HandlerForEvent( ev ) );
                if ( handler != nullptr )
+               {
+                  if ( instrumentation ) ResolveAndCall( "handled", current_state, current_state, ev );
                   handler( ev );
+               }
                else if ( default_handler != nullptr )
+               {
+                  if ( instrumentation ) ResolveAndCall( "handled", current_state, current_state, ev );
                   default_handler( ev );
+               }
+               else
+               {
+                  if ( instrumentation ) ResolveAndCall( "ignored", current_state, current_state, ev );
+               }
             }
             events.pop_front();
          }
@@ -1111,11 +1195,28 @@ namespace Core
       inline bool IsBlocking() const { return not block_cleared_in.empty(); }
 
 
+      /**
+       * Registers a function which is called when ever there is an entry into,
+       * exit from a state, as well as, when an event is being handled within a state.
+       * Also, if an event occurs that is not handled nor does it cause a transition.
+       * This is meant to facilitate instrumentation of the state machine for logging
+       * and debug purposes.
+       * 
+       * @param func - function to call at various points in the machine's life cycle.
+       */
+      void Instrument( InstrumentationFunction func )
+      {
+         instrumentation = func;
+      }
+
+
    private :
       StateID        previous_state;      /// The state prior to the current one.
       StateID        current_state;       /// The index into the state table.
       StateTable     state_table;         /// The registered states.
+      StateNames     state_names;         /// The human readable names of the states.
       Events         events;              /// External events queued up.
+      EventNames     event_names;         /// Human readable names of events.
       Events         internal_events;     /// Internal events queued up.
 
       /// When the StateIDSet is non-empty, then any events arriving via the
@@ -1132,8 +1233,44 @@ namespace Core
       /// states.
       EventNumber    state_transfer_event;
 
+      /// Optional instrumentation that may aid in debugging (or just logging)
+      /// from within the state machine the various transitions taking place.
+      /// 
+      InstrumentationFunction instrumentation{ nullptr };
+
 
    private :
+      /**
+       * Utility to make it easier to call the user's instrumentation function
+       * at various call sites.
+       * 
+       * @param reason       - reason code for the call
+       * @param from_state   - the state from which transitioning
+       * @param to_state     - the state to which transitioning
+       * @param event_number - the cause of the transition
+       */
+      void ResolveAndCall(
+         const std::string & reason,
+         StateID from_state,
+         StateID to_state,
+         EventNumber event_number
+         )
+      {
+         StateName from_state_name = state_names[from_state];
+         if ( from_state_name.empty() ) { from_state_name = std::string("STATE_") + std::to_string( from_state ); }
+         StateName to_state_name = state_names[to_state];
+         if ( to_state_name.empty() ) { to_state_name = std::string("STATE_") + std::to_string( to_state ); }
+         EventNames::iterator it = event_names.find( event_number );
+         EventName event_name;
+         if ( it != event_names.end() )
+            event_name = it->second;
+         else
+            event_name = std::string("EVENT_") + std::to_string( event_number );
+
+         instrumentation( reason, from_state_name, to_state_name, event_name );
+      }
+
+
       /**
        * The mechanism for performing state transitions. If there is an existing
        * non-null state then it's exit function is called (if not null). Once
@@ -1172,6 +1309,7 @@ namespace Core
          ExitFunction on_exit( state_table[current_state]->Exit() );
          if ( on_exit != nullptr )
          {
+            if ( instrumentation ) ResolveAndCall( "exit", current_state, new_state, event );
             on_exit( event );
          }
 
@@ -1195,6 +1333,7 @@ namespace Core
                auto where = block_cleared_in.find( CurrentState() );
                if ( where != block_cleared_in.end() ) { block_cleared_in.clear(); }
             }
+            if ( instrumentation ) ResolveAndCall( "entry", previous_state, current_state, event );
             on_entry( event );
          }
 
