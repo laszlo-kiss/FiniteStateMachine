@@ -652,6 +652,26 @@ namespace Core
       ///
       static const bool SingleDispatchOnly{ true };
 
+      /// A function signature that serves as a state machine instrumentation
+      /// mechanism. It is called by the FSM at various points of the state
+      /// machine's life cycle.
+      ///
+      /// The 'reason' may be: "entry", "exit", "handled", "ignored"
+      /// These refer to the state entry, state exit, event handled and event ignored
+      /// scenarios.
+      /// The 'from_state' is the name of the state from which a transition
+      /// is taking place. The 'to_state' is the state the machine is transitioning
+      /// into. These may be the same name in some circumstances.
+      /// 
+      using InstrumentationFunction =
+         std::function< void (
+            const std::string & reason,
+            const StateName & from_state,
+            const StateName & to_state,
+            const EventName & event_name
+            ) >;
+
+
    public :
       /**
        * Default constructor.
@@ -938,6 +958,33 @@ namespace Core
          }
       }
 
+
+      /**
+       * Registers a function which is called when ever there is an entry into,
+       * exit from a state, as well as, when an event is being handled within a state.
+       * Also, if an event occurs that is not handled nor does it cause a transition.
+       * This is meant to facilitate instrumentation of the state machine for logging
+       * and debug purposes.
+       * 
+       * @param func - function to call at various points in the machine's life cycle.
+       */
+      void Instrument( InstrumentationFunction func )
+      {
+         instrumentation = func;
+      }
+
+      /**
+       * Returns the current instrumentation function. Enables access to a
+       * base class' instrumentation to augment it.
+       * 
+       * @return The existing instrumentation (which could be null).
+       */
+      InstrumentationFunction Instrument()
+      {
+         return instrumentation;
+      }
+
+
    protected :
       /// The states registered for this state machine are held in this type.
       /// The raw pointer here is used only as a reference and the FSM must
@@ -953,25 +1000,6 @@ namespace Core
       /// Events may be registered with a name as well.
       ///
       using EventNames = std::map< EventNumber, std::string >;
-
-      /// A function signature that serves as a state machine instrumentation
-      /// mechanism. It is called by the FSM at various points of the state
-      /// machine's life cycle.
-      ///
-      /// The 'reason' may be: "entry", "exit", "handled", "ignored"
-      /// These refer to the state entry, state exit, event handled and event ignored
-      /// scenarios.
-      /// The 'from_state' is the name of the state from which a transition
-      /// is taking place. The 'to_state' is which state the machine is transitioning
-      /// into. These may be the same name in some circumstances.
-      /// 
-      using InstrumentationFunction =
-         std::function< void (
-            const std::string & reason,
-            const StateName & from_state,
-            const StateName & to_state,
-            const EventName & event_name
-            ) >;
 
 
    protected :
@@ -1193,32 +1221,6 @@ namespace Core
        * @return true if the FSM is blocking conditional events, false otherwise.
        */
       inline bool IsBlocking() const { return not block_cleared_in.empty(); }
-
-
-      /**
-       * Registers a function which is called when ever there is an entry into,
-       * exit from a state, as well as, when an event is being handled within a state.
-       * Also, if an event occurs that is not handled nor does it cause a transition.
-       * This is meant to facilitate instrumentation of the state machine for logging
-       * and debug purposes.
-       * 
-       * @param func - function to call at various points in the machine's life cycle.
-       */
-      void Instrument( InstrumentationFunction func )
-      {
-         instrumentation = func;
-      }
-
-      /**
-       * Returns the current instrumentation function. Enables access to a
-       * base class' instrumentation to augment it.
-       * 
-       * @return The existing instrumentation (which could be null).
-       */
-      InstrumentationFunction Instrument()
-      {
-         return instrumentation;
-      }
 
 
    private :
