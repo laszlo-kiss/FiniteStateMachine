@@ -211,8 +211,8 @@ namespace Core
          /**
           * Sets the state transition to take when a particular event arrives.
           *
-          * @param event   The event that is to be handled.
-          * @param state   The state to which to transition.
+          * @param event_number  The event that is to be handled.
+          * @param state         The state to which to transition.
           * @return The reference to this State object.
           */
          virtual State & SetTransition(
@@ -238,8 +238,8 @@ namespace Core
           * Replaces a an existing transition with another.
           * This is a 'fancy' capability that should be used with caution.
           *
-          * @param event   The event that is to be handled.
-          * @param handler The handler function object to replace the existing one.
+          * @param event_number  The event that is to be replaced.
+          * @param state         The target state of the transition.
           * @return the old state that was replaced or SentinelStateID indicating an error.
           */
          virtual StateID ReplaceTransition(
@@ -262,7 +262,7 @@ namespace Core
           * Removes an existing transition.
           * This is a 'fancy' capability that should be used with caution.
           *
-          * @param event   The event that is to be removed from the transition table.
+          * @param event_number  The event that is to be removed from the transition table.
           * @return the old state to which the removed event was transitioning
           *    or SentinelStateID indicating that there was no such transition.
           */
@@ -305,7 +305,7 @@ namespace Core
           * Retrieves the target state if a transition was installed for the
           * provided event.
           *
-          * @param event   The event for which the target state is needed.
+          * @param event_number  The event number for which the target state is needed.
           * @return the StateID of the target state or SentinelStateID if there is no such.
           */
          inline StateID TransitionForEvent(
@@ -326,8 +326,8 @@ namespace Core
           * Sets the event handler function the FSM calls when an event needs
           * to be handled.
           *
-          * @param event   The event that is to be handled.
-          * @param handler The handler function object to set.
+          * @param event_number  The event that is to be handled.
+          * @param handler       The handler function object to set.
           * @param single_dispatch_only If the handler can only be executed once.
           * @return The reference to this State object.
           */
@@ -369,7 +369,7 @@ namespace Core
           * Replaces a potentially existing event handler function with another.
           * This is a 'fancy' capability that should be used with caution.
           *
-          * @param event   The event that is to be handled.
+          * @param event_number  The event that is to be handled.
           * @param handler The handler function object to replace the existing one.
           * @return The event handler that was replaced.
           */
@@ -532,7 +532,7 @@ namespace Core
          /**
           * Forwards events that were stored based on the transition event given.
           *
-          * @param event   The transition event.
+          * @param event_number  The transition event.
           * @param destination   The next state's event_store.
           */
          void ForwardEvents(
