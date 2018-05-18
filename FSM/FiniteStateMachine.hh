@@ -696,7 +696,8 @@ namespace Core
        * The passed in state object remains the property and responsibility of
        * the caller.
        *
-       * @param state   The state object to register with the FSM.
+       * @param state       The state object to register with the FSM.
+       * @param state_name  A human readable name for the state.
        * @return the state identifier chosen for the state.
        */
       virtual StateID RegisterState(
@@ -723,7 +724,8 @@ namespace Core
        * 
        * @param  state_id - the identifier of the state to replace
        * @param  state    - the new state object to replace it with
-       * @return          - the old state being replaced
+       * @param  state_name   - a human readable name for the state
+       * @return the old state being replaced.
        */
       State * ReplaceState(
          StateID state_id,
@@ -852,6 +854,10 @@ namespace Core
 
 
       /**
+       * Checks whether the event passed in is a direct state transfer
+       * event or not.
+       *
+       * @param event   the event to check
        * @return true if the event passed in is a direct state transfer
        *    event, false otherwise.
        *
@@ -1016,6 +1022,8 @@ namespace Core
        * help with the asynchronous version of this class. In that case a
        * proper replacement should be defined that delivers the event to the
        * appropriate thread context.
+       *
+       * @param event   the event to be delivered
        */
       virtual void EventDeliveryMethod( const Event & event )
       {
@@ -1029,6 +1037,8 @@ namespace Core
        * state does not handle. If not set, undefined events for a particular
        * state are simply ignored. If defined, then it is executed if the
        * state has no event handler defined.
+       *
+       * @param handler   the event handler to install as the default handler
        */
       inline void InstallDefaultEventHandler( const EventHandler & handler )
       {
@@ -1174,6 +1184,8 @@ namespace Core
 
       /**
        * Removes the specific event from the external event queue.
+       *
+       * @param event_number    the event to remove from the external queue
        */
       inline void RemoveEvent( EventNumber event_number )
       {
@@ -1184,6 +1196,8 @@ namespace Core
 
       /**
        * Removes the specific event from the internal event queue.
+       *
+       * @param event_number    the event to remove from the internal queue
        */
       inline void RemoveInternalEvent( EventNumber event_number )
       {
