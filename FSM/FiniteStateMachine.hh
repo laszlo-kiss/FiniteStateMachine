@@ -378,7 +378,7 @@ namespace Core
             const EventHandler & handler
             )
          {
-            EventHandler old_handler{};
+            EventHandler old_handler{ nullptr };
             auto sit = single_dispatch.find( event_number );
             if ( sit != single_dispatch.end() )
             {
@@ -448,10 +448,8 @@ namespace Core
          {
             EventHandler handler{ default_handler };
             auto dit = dispatch_table.find( event_number );
-            if ( dit != dispatch_table.end() )
-            {
-               handler = dit->second;
-            }
+            if ( dit == dispatch_table.end() ) { return nullptr; }
+            handler = dit->second;
             auto sit = single_dispatch.find( event_number );
             if ( sit != single_dispatch.end() )
             {
